@@ -74,11 +74,26 @@ def get_metric_history(metric_name, days=365):
     """
     return safe_query(query)
 
-def get_states_data():
-    """Get real state-level data from database view"""
+def get_states_data(time_period='latest'):
+    """Get real state-level data from database view with time period support"""
     try:
-        # Query the state metrics view for real data
-        query = """
+        # Build date filter based on time period
+        date_filter = ""
+        if time_period == '1_month_ago':
+            date_filter = "AND last_updated >= CURRENT_DATE - INTERVAL '1 month'"
+        elif time_period == '3_months_ago':
+            date_filter = "AND last_updated >= CURRENT_DATE - INTERVAL '3 months'"
+        elif time_period == '6_months_ago':
+            date_filter = "AND last_updated >= CURRENT_DATE - INTERVAL '6 months'"
+        elif time_period == '1_year_ago':
+            date_filter = "AND last_updated >= CURRENT_DATE - INTERVAL '1 year'"
+        elif time_period == '2_years_ago':
+            date_filter = "AND last_updated >= CURRENT_DATE - INTERVAL '2 years'"
+        elif time_period == '5_years_ago':
+            date_filter = "AND last_updated >= CURRENT_DATE - INTERVAL '5 years'"
+        
+        # Query the state metrics view for real data with time filter
+        query = f"""
         SELECT 
             state,
             state_name,
@@ -101,6 +116,7 @@ def get_states_data():
             last_updated
         FROM vw_state_metrics
         WHERE state IS NOT NULL
+        {date_filter}
         ORDER BY state
         """
         
@@ -292,7 +308,7 @@ def calculate_real_estate_risk_score(states_data):
 
 def perform_regression_analysis():
     """Perform comprehensive regression analysis on state data"""
-    states_data = get_states_data()
+    states_data = get_states_data('latest')  # Use latest data for regression
     
     # Prepare data for regression - use available columns
     available_features = ['unemployment_rate', 'population', 'gdp_per_capita', 'value_to_income_ratio']
@@ -390,10 +406,10 @@ def perform_regression_analysis():
 
 def create_global_analysis_charts():
     """Create global analysis charts"""
-    states_data = get_states_data()
+    states_data = get_states_data('latest')  # Use latest data for global analysis
     
     # Correlation matrix - use available columns
-    available_numeric_cols = ['home_value', 'unemployment_rate', 'price_growth_yoy', 'total_population', 'gdp_per_capita', 'median_household_income']
+    available_numeric_cols = ['home_value', 'unemployment_rate', 'price_growth_yoy', 'population', 'gdp_per_capita', 'value_to_income_ratio']
     corr_matrix = states_data[available_numeric_cols].corr()
     
     # Create correlation heatmap
@@ -415,7 +431,7 @@ def create_global_analysis_charts():
     )
     
     dist_fig.add_trace(go.Histogram(x=states_data['home_value'], name='Home Value'), row=1, col=1)
-    dist_fig.add_trace(go.Histogram(x=states_data['median_household_income'], name='Median Income'), row=1, col=2)
+    dist_fig.add_trace(go.Histogram(x=states_data['value_to_income_ratio'], name='Value/Income Ratio'), row=1, col=2)
     dist_fig.add_trace(go.Histogram(x=states_data['unemployment_rate'], name='Unemployment'), row=2, col=1)
     dist_fig.add_trace(go.Histogram(x=states_data['price_growth_yoy'], name='Price Growth'), row=2, col=2)
     
@@ -703,7 +719,7 @@ def update_metrics(selected_metric):
 def update_us_map(selected_metric, color_scale, time_period):
     """Update US states map"""
     try:
-        states_data = get_states_data()
+        states_data = get_states_data(time_period)
         
         # Add time period info to title
         time_period_label = {
@@ -869,7 +885,7 @@ def update_regression_analysis(selected_metric):
 def update_risk_analysis(selected_metric):
     """Update real estate risk analysis"""
     try:
-        states_data = get_states_data()
+        states_data = get_states_data('latest')  # Use latest data for risk analysis
         risk_factors = calculate_real_estate_risk_score(states_data)
         
         # Add risk scores to states data

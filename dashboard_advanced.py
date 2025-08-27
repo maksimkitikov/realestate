@@ -448,7 +448,9 @@ app.layout = html.Div([
         html.H1("🏠 Advanced US Real Estate Analytics Dashboard", 
                 style={'textAlign': 'center', 'color': '#2c3e50', 'marginBottom': 10}),
         html.H3("Interactive State-Level Analysis with Regression Models", 
-                style={'textAlign': 'center', 'color': '#7f8c8d', 'marginBottom': 30})
+                style={'textAlign': 'center', 'color': '#7f8c8d', 'marginBottom': 10}),
+        html.P("📊 Data Source: FRED API (Federal Reserve Economic Data)", 
+               style={'textAlign': 'center', 'color': '#95a5a6', 'fontSize': '12px', 'marginBottom': 30})
     ]),
     
     # Key Metrics Row

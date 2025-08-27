@@ -1,0 +1,37 @@
+{
+  "version": "1.0",
+  "connections": [
+    {
+      "filePath": "powerbi-neon.pbids",
+      "connectionType": "postgresql",
+      "connectionId": "neon-connection",
+      "name": "Neon Real Estate Analytics",
+      "description": "DirectQuery подключение к Neon Postgres для Real Estate Analytics",
+      "server": "ep-icy-sunset-a1dfl5uk-pooler.ap-southeast-1.aws.neon.tech",
+      "database": "neondb",
+      "username": "neondb_owner",
+      "password": "",
+      "sslMode": "require",
+      "channelBinding": "require",
+      "port": 5432,
+      "commandTimeout": 600,
+      "queryTimeout": 600,
+      "applicationName": "Power BI Real Estate Analytics",
+      "useSSL": true,
+      "trustServerCertificate": false,
+      "encryptConnection": true,
+      "integratedSecurity": false,
+      "persistSecurityInfo": false,
+      "defaultSchema": "public"
+    }
+  ],
+  "dataSources": [
+    {
+      "type": "postgresql",
+      "connectionId": "neon-connection",
+      "gatewayId": "",
+      "name": "Neon Real Estate Analytics",
+      "path": "powerbi-neon.pbids"
+    }
+  ]
+}

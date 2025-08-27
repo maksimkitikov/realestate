@@ -1,0 +1,118 @@
+# Data Sources Configuration
+# Configuration for all external data sources
+
+fred:
+  base_url: "https://api.stlouisfed.org/fred"
+  series:
+    - id: "MORTGAGE30US"
+      name: "30-Year Fixed Rate Mortgage Average"
+      frequency: "weekly"
+    - id: "CPIAUCSL"
+      name: "Consumer Price Index for All Urban Consumers"
+      frequency: "monthly"
+    - id: "DGS10"
+      name: "10-Year Treasury Constant Maturity Rate"
+      frequency: "daily"
+    - id: "T10Y2Y"
+      name: "10-Year minus 2-Year Treasury Constant Maturity Rate"
+      frequency: "daily"
+    - id: "UNRATE"
+      name: "Unemployment Rate"
+      frequency: "monthly"
+
+bls:
+  base_url: "https://api.bls.gov/publicAPI/v2/timeseries/data"
+  series_template: "LASST{state_fips}0000000000003"
+  states:
+    - fips: "01", abbr: "AL", name: "Alabama"
+    - fips: "02", abbr: "AK", name: "Alaska"
+    - fips: "04", abbr: "AZ", name: "Arizona"
+    - fips: "05", abbr: "AR", name: "Arkansas"
+    - fips: "06", abbr: "CA", name: "California"
+    - fips: "08", abbr: "CO", name: "Colorado"
+    - fips: "09", abbr: "CT", name: "Connecticut"
+    - fips: "10", abbr: "DE", name: "Delaware"
+    - fips: "11", abbr: "DC", name: "District of Columbia"
+    - fips: "12", abbr: "FL", name: "Florida"
+    - fips: "13", abbr: "GA", name: "Georgia"
+    - fips: "15", abbr: "HI", name: "Hawaii"
+    - fips: "16", abbr: "ID", name: "Idaho"
+    - fips: "17", abbr: "IL", name: "Illinois"
+    - fips: "18", abbr: "IN", name: "Indiana"
+    - fips: "19", abbr: "IA", name: "Iowa"
+    - fips: "20", abbr: "KS", name: "Kansas"
+    - fips: "21", abbr: "KY", name: "Kentucky"
+    - fips: "22", abbr: "LA", name: "Louisiana"
+    - fips: "23", abbr: "ME", name: "Maine"
+    - fips: "24", abbr: "MD", name: "Maryland"
+    - fips: "25", abbr: "MA", name: "Massachusetts"
+    - fips: "26", abbr: "MI", name: "Michigan"
+    - fips: "27", abbr: "MN", name: "Minnesota"
+    - fips: "28", abbr: "MS", name: "Mississippi"
+    - fips: "29", abbr: "MO", name: "Missouri"
+    - fips: "30", abbr: "MT", name: "Montana"
+    - fips: "31", abbr: "NE", name: "Nebraska"
+    - fips: "32", abbr: "NV", name: "Nevada"
+    - fips: "33", abbr: "NH", name: "New Hampshire"
+    - fips: "34", abbr: "NJ", name: "New Jersey"
+    - fips: "35", abbr: "NM", name: "New Mexico"
+    - fips: "36", abbr: "NY", name: "New York"
+    - fips: "37", abbr: "NC", name: "North Carolina"
+    - fips: "38", abbr: "ND", name: "North Dakota"
+    - fips: "39", abbr: "OH", name: "Ohio"
+    - fips: "40", abbr: "OK", name: "Oklahoma"
+    - fips: "41", abbr: "OR", name: "Oregon"
+    - fips: "42", abbr: "PA", name: "Pennsylvania"
+    - fips: "44", abbr: "RI", name: "Rhode Island"
+    - fips: "45", abbr: "SC", name: "South Carolina"
+    - fips: "46", abbr: "SD", name: "South Dakota"
+    - fips: "47", abbr: "TN", name: "Tennessee"
+    - fips: "48", abbr: "TX", name: "Texas"
+    - fips: "49", abbr: "UT", name: "Utah"
+    - fips: "50", abbr: "VT", name: "Vermont"
+    - fips: "51", abbr: "VA", name: "Virginia"
+    - fips: "53", abbr: "WA", name: "Washington"
+    - fips: "54", abbr: "WV", name: "West Virginia"
+    - fips: "55", abbr: "WI", name: "Wisconsin"
+    - fips: "56", abbr: "WY", name: "Wyoming"
+
+bea:
+  base_url: "https://apps.bea.gov/api/data"
+  dataset: "RegionalData"
+  table: "SINC1"
+  linecode: "1"
+  frequency: "Q"
+
+census:
+  base_url: "https://api.census.gov/data"
+  acs:
+    year: 2022
+    survey: "acs/acs1"
+    variables:
+      - "B12001_001E"  # Total population
+      - "B12001_010E"  # Male divorced
+      - "B12001_015E"  # Female divorced
+      - "B19013_001E"  # Median household income
+  building_permits:
+    url: "https://www.census.gov/construction/bps/xls/bps_state.xls"
+
+hud:
+  base_url: "https://www.huduser.gov/hudapi/public/fmr"
+  year: 2024
+
+fhfa:
+  hpi_url: "https://www.fhfa.gov/DataTools/Downloads/Documents/HPI/HPI_AT_state.csv"
+
+redfin:
+  data_center_url: "https://redfin-public-data.s3.us-west-2.amazonaws.com/redfin_market_tracker/city_market_tracker.tsv000.gz"
+
+realtor:
+  inventory_url: "https://www.realtor.com/research/data/"
+
+fema:
+  base_url: "https://www.fema.gov/api/open/v2"
+  endpoint: "DisasterDeclarationsSummaries"
+
+mit_election:
+  base_url: "https://dataverse.harvard.edu/api/access/datafile/"
+  file_id: "6104812"

@@ -55,6 +55,41 @@ def check_view(view_name):
         print(f"❌ {view_name}: ошибка - {e}")
         return 0
 
+def check_data():
+    engine = create_engine(os.getenv('DATABASE_URL'))
+    with engine.connect() as conn:
+        # Проверяем источники данных
+        result = conn.execute(text("""
+            SELECT source, metric, freq, COUNT(*) 
+            FROM fact_metric 
+            WHERE source IN ('FRED','BLS_LAUS','BEA','CENSUS_ACS') 
+            GROUP BY source, metric, freq 
+            ORDER BY source, metric
+        """))
+        print("Data sources summary:")
+        for row in result:
+            print(f"  {row}")
+        
+        # Проверяем последние значения FRED
+        result = conn.execute(text("""
+            SELECT metric, value, date 
+            FROM fact_metric 
+            WHERE source = 'FRED' 
+            AND date = (SELECT MAX(date) FROM fact_metric WHERE source = 'FRED')
+            ORDER BY metric
+        """))
+        print("\nLatest FRED values:")
+        for row in result:
+            print(f"  {row}")
+        
+        # Проверяем количество штатов с данными
+        result = conn.execute(text("""
+            SELECT COUNT(DISTINCT geo_key) as states_count
+            FROM fact_metric 
+            WHERE geo_level = 'STATE'
+        """))
+        print(f"\nStates with data: {result.fetchone()[0]}")
+
 def main():
     """Основная функция проверки"""
     print("🔍 Проверка данных в базе...")

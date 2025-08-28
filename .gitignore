@@ -1,3 +1,8 @@
+# Environment variables
+.env
+.env.local
+.env.production
+
 # Python
 __pycache__/
 *.py[cod]
@@ -27,13 +32,6 @@ env/
 ENV/
 env.bak/
 venv.bak/
-
-# Environment variables
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
 
 # IDE
 .vscode/
@@ -66,5 +64,36 @@ logs/
 temp/
 tmp/
 
-# ngrok
-ngrok.yml
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# celery beat schedule file
+celerybeat-schedule
+
+# SageMath parsed files
+*.sage.py
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Backup files
+*.bak
+*.backup

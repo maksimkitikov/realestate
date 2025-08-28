@@ -75,108 +75,140 @@ def get_metric_history(metric_name, days=365):
     return safe_query(query)
 
 def get_states_data(time_period='latest'):
-    """Get real state-level data from database view with time period support"""
+    """Вернуть реальное сечение по штатам на выбранный период (без моков).
+
+    Собираем метрики напрямую из fact_metric, берём последнее значение по каждому штату,
+    дата которого не позже граничной даты (cutoff). Для производительности используем DISTINCT ON.
+    """
     try:
-        # Query the state metrics view for real data
-        query = """
-        SELECT 
-            state,
-            state_name,
-            home_value,
-            price_growth_yoy,
-            unemployment_rate,
-            income_growth_yoy as income_growth,
-            total_population as population,
-            gdp_per_capita,
-            median_days_on_market,
-            months_of_supply,
-            homeownership_rate,
-            education_rate,
-            divorce_rate,
-            disaster_rate_3yr,
-            political_competitiveness,
-            risk_score,
-            value_to_income_ratio,
-            market_temperature,
-            last_updated
-        FROM vw_state_metrics
-        WHERE state IS NOT NULL
-        ORDER BY state
-        """
-        
-        df = safe_query(query)
-        
-        if df.empty:
-            logger.warning("No real state data available, using fallback sample data")
-            return get_fallback_states_data()
-        
-        # Replace None values with NaN
-        df = df.replace('None', np.nan)
-        for col in df.columns:
-            df[col] = df[col].replace([None], np.nan)
-        
-        # Fill missing values with reasonable defaults (but preserve variation)
-        df = df.fillna({
-            'home_value': 250000,
-            'unemployment_rate': 4.0,
-            'population': 1000000,
-            'gdp_per_capita': 50000,
-            'homeownership_rate': 65.0,
-            'education_rate': 30.0,
-            'divorce_rate': 10.0,
-            'disaster_rate_3yr': 1.0,
-            'risk_score': 25.0,
-            'value_to_income_ratio': 4.0
-        })
-        
-        # Generate realistic variation for metrics that were constant
-        import random
-        random.seed(42)  # For reproducible results
-        
-        # Apply time period adjustments
-        time_multiplier = 1.0
-        if time_period == '1_month_ago':
-            time_multiplier = 0.95
-        elif time_period == '3_months_ago':
-            time_multiplier = 0.90
-        elif time_period == '6_months_ago':
-            time_multiplier = 0.85
-        elif time_period == '1_year_ago':
-            time_multiplier = 0.75
-        elif time_period == '2_years_ago':
-            time_multiplier = 0.60
-        elif time_period == '5_years_ago':
-            time_multiplier = 0.40
-        
-        # Price growth YoY: vary between -5% and +15%
-        if df['price_growth_yoy'].std() == 0:
-            df['price_growth_yoy'] = [random.uniform(-5, 15) * time_multiplier for _ in range(len(df))]
-        
-        # Income growth: vary between 1% and 5%
-        if df['income_growth'].std() == 0:
-            df['income_growth'] = [random.uniform(1, 5) * time_multiplier for _ in range(len(df))]
-        
-        # Days on market: vary between 20 and 80 days
-        if df['median_days_on_market'].std() == 0:
-            df['median_days_on_market'] = [random.uniform(20, 80) / time_multiplier for _ in range(len(df))]
-        
-        # Months of supply: vary between 1.5 and 6 months
-        if df['months_of_supply'].std() == 0:
-            df['months_of_supply'] = [random.uniform(1.5, 6) / time_multiplier for _ in range(len(df))]
-        
-        # Political competitiveness: vary between 5 and 25
-        if df['political_competitiveness'].std() == 0:
-            df['political_competitiveness'] = [random.uniform(5, 25) for _ in range(len(df))]
-        
-        # Adjust home values based on time period
-        df['home_value'] = df['home_value'] * time_multiplier
-        
+        # Определяем граничную дату
+        interval_map = {
+            'latest': None,
+            '1m': "1 month",
+            '3m': "3 months",
+            '6m': "6 months",
+            '1y': "1 year",
+            '2y': "2 years",
+        }
+        interval = interval_map.get(time_period, None)
+
+        def latest_per_state(metric_key: str, cutoff_interval: str):
+            base = f"""
+                SELECT dg.geo_key, dg.state_abbr AS state, dg.name AS state_name, fm.value, fm.date
+                FROM dim_geo dg
+                LEFT JOIN LATERAL (
+                    SELECT value, date
+                    FROM fact_metric f
+                    WHERE f.geo_level='STATE' AND f.geo_key = dg.geo_key AND f.metric = '{metric_key}'
+                    {{cutoff_clause}}
+                    ORDER BY date DESC
+                    LIMIT 1
+                ) fm ON TRUE
+                WHERE dg.level='STATE'
+            """
+            cutoff_clause = ""
+            if cutoff_interval:
+                cutoff_clause = f"AND date <= CURRENT_DATE - INTERVAL '{cutoff_interval}'"
+            q = base.replace("{cutoff_clause}", cutoff_clause)
+            return safe_query(q)
+
+        # Базовая таблица штатов
+        states = safe_query("SELECT geo_key, state_abbr AS state, name AS state_name FROM dim_geo WHERE level='STATE'")
+        if states.empty:
+            logger.warning("No states in dim_geo")
+            return pd.DataFrame()
+
+        # Реальные метрики
+        home_value_df = latest_per_state('MEDIAN_SALE_PRICE', interval)
+        if home_value_df['value'].isna().all():
+            # fallback на ACS home value если отсутствует Redfin
+            home_value_df = latest_per_state('MEDIAN_HOME_VALUE', interval)
+
+        hpi_yoy_df = latest_per_state('HPI_GROWTH_YOY', interval)
+        unemp_df = latest_per_state('UNEMPLOYMENT_RATE', interval)
+        dom_df = latest_per_state('DAYS_ON_MARKET', interval)
+        months_supply_df = latest_per_state('MONTHS_OF_SUPPLY', interval)
+        homeowners_df = latest_per_state('HOMEOWNERSHIP_RATE', interval)
+        edu_df = latest_per_state('EDUCATION_RATE', interval)
+        divorce_df = latest_per_state('DIVORCE_RATE', interval)
+        disaster_df = latest_per_state('DISASTER_RATE_3YR_AVG', interval)
+        income_df = latest_per_state('MEDIAN_HOUSEHOLD_INCOME', interval)
+        pop_df = latest_per_state('TOTAL_POPULATION', interval)
+        gdp_df = latest_per_state('GDP_TOTAL', interval)
+
+        # Сборка датафрейма
+        df = states.copy()
+        def join_metric(src: pd.DataFrame, col: str):
+            # Всегда создаём столбец; если данных нет, он будет заполнен NaN
+            if src is None or src.empty:
+                df[col] = np.nan
+                return
+            df[col] = df.merge(src[['geo_key','value']], on='geo_key', how='left')['value']
+
+        join_metric(home_value_df, 'home_value')
+        join_metric(hpi_yoy_df, 'price_growth_yoy')
+        join_metric(unemp_df, 'unemployment_rate')
+        join_metric(dom_df, 'median_days_on_market')
+        if not months_supply_df.empty and months_supply_df['value'].notna().any():
+            join_metric(months_supply_df, 'months_of_supply')
+        join_metric(homeowners_df, 'homeownership_rate')
+        join_metric(edu_df, 'education_rate')
+        join_metric(divorce_df, 'divorce_rate')
+        join_metric(disaster_df, 'disaster_rate_3yr')
+        join_metric(pop_df, 'population')
+        join_metric(gdp_df, 'gdp_total')
+        join_metric(income_df, 'median_household_income')
+
+        # GDP per capita и value_to_income_ratio
+        if 'gdp_total' in df.columns and 'population' in df.columns:
+            df['gdp_per_capita'] = np.where((df['gdp_total'].notna()) & (df['population'].notna()) & (df['population']>0),
+                                            df['gdp_total'] / df['population'], np.nan)
+        if 'median_household_income' in df.columns and 'home_value' in df.columns:
+            df['value_to_income_ratio'] = np.where((df['median_household_income'].notna()) & (df['median_household_income']>0) & (df['home_value'].notna()),
+                                                   df['home_value'] / df['median_household_income'], np.nan)
+
+        # Income growth YoY от median_household_income если доступно, иначе от PERSONAL_INCOME
+        # median income YoY
+        # корректный cutoff для предыдущего года:
+        # if latest: cutoff_prev = CURRENT_DATE - INTERVAL '1 year'
+        # if interval=X: cutoff_prev = CURRENT_DATE - INTERVAL '1 year' - INTERVAL 'X'
+        def latest_per_state_with_expr(metric_key: str, cutoff_expr_sql: str | None):
+            base = f"""
+                SELECT dg.geo_key, dg.state_abbr AS state, dg.name AS state_name, fm.value, fm.date
+                FROM dim_geo dg
+                LEFT JOIN LATERAL (
+                    SELECT value, date
+                    FROM fact_metric f
+                    WHERE f.geo_level='STATE' AND f.geo_key = dg.geo_key AND f.metric = '{metric_key}'
+                    {{cutoff_clause}}
+                    ORDER BY date DESC
+                    LIMIT 1
+                ) fm ON TRUE
+                WHERE dg.level='STATE'
+            """
+            cutoff_clause = ""
+            if cutoff_expr_sql:
+                cutoff_clause = f"AND date <= {cutoff_expr_sql}"
+            q = base.replace("{cutoff_clause}", cutoff_clause)
+            return safe_query(q)
+
+        if interval is None:
+            cutoff_prev_expr = "CURRENT_DATE - INTERVAL '1 year'"
+        else:
+            cutoff_prev_expr = f"CURRENT_DATE - INTERVAL '1 year' - INTERVAL '{interval}'"
+        income_prev = latest_per_state_with_expr('MEDIAN_HOUSEHOLD_INCOME', cutoff_prev_expr)
+        if not income_df.empty and not income_prev.empty:
+            tmp = df[['geo_key']].merge(income_df[['geo_key','value']].rename(columns={'value':'cur_inc'}), on='geo_key', how='left')
+            tmp = tmp.merge(income_prev[['geo_key','value']].rename(columns={'value':'prev_inc'}), on='geo_key', how='left')
+            df['income_growth'] = np.where((tmp['cur_inc'].notna()) & (tmp['prev_inc'].notna()) & (tmp['prev_inc']!=0),
+                                           (tmp['cur_inc']/tmp['prev_inc'] - 1)*100, np.nan)
+
         logger.info(f"Retrieved real state data for {len(df)} states from database")
         return df
-        
+
     except Exception as e:
         logger.error(f"Error fetching real state data: {e}")
-        return get_fallback_states_data()
+        return pd.DataFrame()
 
 def get_fallback_states_data():
     """Fallback sample data if database is not available"""

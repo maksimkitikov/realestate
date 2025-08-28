@@ -63,11 +63,10 @@ class FHFAIngester(BaseIngester):
             
         except requests.exceptions.RequestException as e:
             logger.error(f"Error fetching FHFA HPI data: {e}")
-            # If the primary URL fails, try alternative approach with sample data structure
-            return self._create_sample_hpi_data()
+            return pd.DataFrame()
         except pd.errors.ParserError as e:
             logger.error(f"Error parsing FHFA CSV: {e}")
-            return self._create_sample_hpi_data()
+            return pd.DataFrame()
     
     def _create_sample_hpi_data(self) -> pd.DataFrame:
         """Create sample HPI data structure for testing"""
@@ -110,9 +109,8 @@ class FHFAIngester(BaseIngester):
         return pd.DataFrame(sample_data)
     
     def fetch_data(self) -> pd.DataFrame:
-        """Fetch FHFA HPI data - currently not implemented"""
-        logger.error("FHFA HPI data fetching not implemented - no real API available")
-        return pd.DataFrame()
+        """Fetch FHFA HPI data"""
+        return self.fetch_hpi_data()
         
         states = get_all_states()
         all_data = []

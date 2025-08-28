@@ -203,8 +203,8 @@ class BEAIngester(BaseIngester):
             all_data.append(gdp_data)
         
         if not all_data:
-            logger.warning("No BEA data retrieved, using synthetic fallback")
-            return self._generate_synthetic_data()
+            logger.warning("No BEA data retrieved (returning empty); no synthetic fallback in production")
+            return pd.DataFrame()
         
         combined_df = pd.concat(all_data, ignore_index=True)
         logger.info(f"Retrieved {len(combined_df)} BEA economic records")

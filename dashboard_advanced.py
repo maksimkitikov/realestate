@@ -500,6 +500,9 @@ def create_global_analysis_charts():
 # Create Dash app
 app = dash.Dash(__name__, title="Advanced US Real Estate Analytics Dashboard")
 
+# Export server for production deployment
+server = app.server
+
 app.layout = html.Div([
     # Header
     html.Div([

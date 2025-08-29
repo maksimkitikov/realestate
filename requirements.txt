@@ -1,4 +1,6 @@
 # Core dependencies
+setuptools>=65.0.0
+wheel>=0.38.0
 python-dotenv==1.0.1
 pandas==2.0.3
 numpy==1.24.3

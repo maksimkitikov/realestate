@@ -1,18 +1,14 @@
 #!/usr/bin/env python3
 """
-US Real Estate Analytics Dashboard - Production Ready for Render
+Render deployment entry point for Real Estate Dashboard
+Developed by Maksim Kitikov - Upside Analytics
 """
 
-# Import the main dashboard application
-from dashboard_advanced import app
+import os
+import sys
+from dashboard_advanced import app, server
 
-# Export server for Gunicorn
-server = app.server
-
+# For Render deployment
 if __name__ == '__main__':
-    import os
-    print("🚀 Starting US Real Estate Analytics Dashboard...")
-    print("🌐 Open http://localhost:8050 in your browser")
-    print("🗺️ Features: Interactive US States Map, Real-time Analytics")
-    print("📊 Production-ready analytics platform")
-    app.run_server(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 8050)))
+    port = int(os.environ.get('PORT', 8050))
+    app.run_server(debug=False, host='0.0.0.0', port=port)

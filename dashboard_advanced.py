@@ -1251,6 +1251,9 @@ def update_system_status(selected_metric):
         logger.error(f"Error updating system status: {e}")
         return html.Div("Error loading system status", style={'color': 'red'})
 
+# Export server for Gunicorn
+server = app.server
+
 if __name__ == '__main__':
     print("🚀 Starting Advanced US Real Estate Analytics Dashboard...")
     print("🌐 Open http://localhost:8050 in your browser")

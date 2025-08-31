@@ -33,16 +33,26 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Database connection
+# Database connection (optional)
 DB_URL = os.getenv("DATABASE_URL", "")
-if not DB_URL:
-    print("❌ DATABASE_URL not found in environment variables")
-    exit(1)
+engine = None
 
-engine = create_engine(DB_URL, pool_pre_ping=True)
+if DB_URL:
+    try:
+        engine = create_engine(DB_URL, pool_pre_ping=True)
+        print("✅ Database connection established")
+    except Exception as e:
+        print(f"⚠️ Database connection failed: {e}")
+        engine = None
+else:
+    print("⚠️ DATABASE_URL not found - running in demo mode")
 
 def safe_query(query, default_df=None):
     """Safe query execution with error handling"""
+    if engine is None:
+        logger.warning("No database connection - returning empty DataFrame")
+        return default_df if default_df is not None else pd.DataFrame()
+    
     try:
         df = pd.read_sql(query, engine)
         return df

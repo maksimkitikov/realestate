@@ -68,7 +68,7 @@ def get_latest_metrics():
     """Get latest economic metrics from all APIs"""
     metrics = {}
     
-    # FRED Series IDs
+    # Core FRED Series IDs
     fred_series = {
         'MORTGAGE30US': '30-Year Fixed Rate Mortgage Average',
         'CPIAUCSL': 'Consumer Price Index',
@@ -76,7 +76,7 @@ def get_latest_metrics():
         'DGS10': '10-Year Treasury Constant Maturity Rate'
     }
     
-    # Get FRED data
+    # Get core FRED data
     for series_id, description in fred_series.items():
         data = get_fred_data(series_id)
         if data and data['value'] is not None:
@@ -87,35 +87,13 @@ def get_latest_metrics():
                 'source': 'FRED'
             }
     
-    # Get BEA GDP data
-    bea_data = get_bea_data("GDP", "T10101")
-    if bea_data:
-        metrics['GDP'] = {
-            'value': bea_data['value'],
-            'date': bea_data['date'],
-            'description': 'Gross Domestic Product (BEA)',
-            'source': 'BEA'
-        }
+    # Get additional FRED data
+    additional_data = get_additional_fred_data()
+    metrics.update(additional_data)
     
-    # Get BLS employment data
-    bls_data = get_bls_data("CES0000000001")
-    if bls_data:
-        metrics['EMPLOYMENT'] = {
-            'value': bls_data['value'],
-            'date': bls_data['date'],
-            'description': 'Total Nonfarm Employment (BLS)',
-            'source': 'BLS'
-        }
-    
-    # Get Census housing data
-    census_data = get_census_data()
-    if census_data:
-        metrics['MEDIAN_HOME_VALUE'] = {
-            'value': census_data['value'],
-            'date': census_data['date'],
-            'description': 'Median Home Value (Census ACS)',
-            'source': 'Census'
-        }
+    # Get mock data for missing APIs
+    mock_data = get_mock_data_for_missing_apis()
+    metrics.update(mock_data)
     
     return metrics
 
@@ -174,107 +152,63 @@ def get_states_data():
     
     return pd.DataFrame(states)
 
-def get_bea_data(series_id, table_id="GDP"):
-    """Get data from BEA API"""
+def get_additional_fred_data():
+    """Get additional economic data from FRED API"""
+    additional_metrics = {}
+    
+    # Additional FRED series for more comprehensive data
+    additional_series = {
+        'GDPC1': 'Real GDP',
+        'PAYEMS': 'Total Nonfarm Payrolls', 
+        'MSPUS': 'Median Sales Price of Houses Sold',
+        'HOUST': 'Housing Starts',
+        'CSUSHPISA': 'Case-Shiller Home Price Index'
+    }
+    
+    for series_id, description in additional_series.items():
+        data = get_fred_data(series_id)
+        if data and data['value'] is not None:
+            additional_metrics[series_id] = {
+                'value': data['value'],
+                'date': data['date'],
+                'description': description,
+                'source': 'FRED'
+            }
+    
+    return additional_metrics
+
+def get_mock_data_for_missing_apis():
+    """Provide mock data when other APIs are not available"""
+    mock_data = {}
+    
+    # Mock BEA GDP data
     if not BEA_API_KEY:
-        return None
-    
-    try:
-        url = "https://apps.bea.gov/api/data"
-        params = {
-            'UserID': BEA_API_KEY,
-            'Method': 'GetData',
-            'DataSetName': 'NIPA',
-            'TableName': table_id,
-            'Frequency': 'Q',
-            'Year': '2023,2024',
-            'ResultFormat': 'JSON'
+        mock_data['GDP_MOCK'] = {
+            'value': 27000.0,  # ~27 trillion
+            'date': '2024-Q3',
+            'description': 'GDP (Mock Data - BEA API Key Missing)',
+            'source': 'Mock'
         }
-        
-        response = requests.get(url, params=params, timeout=30)
-        response.raise_for_status()
-        
-        data = response.json()
-        if 'BEAAPI' in data and 'Results' in data['BEAAPI']:
-            results = data['BEAAPI']['Results']
-            if 'Data' in results:
-                latest_data = results['Data'][-1] if results['Data'] else None
-                if latest_data:
-                    return {
-                        'value': float(latest_data.get('DataValue', 0)),
-                        'date': latest_data.get('TimePeriod', ''),
-                        'description': latest_data.get('LineDescription', '')
-                    }
-    except Exception as e:
-        logger.error(f"BEA API error: {e}")
     
-    return None
-
-def get_bls_data(series_id):
-    """Get data from BLS API"""
+    # Mock BLS employment data  
     if not BLS_API_KEY:
-        return None
-    
-    try:
-        url = "https://api.bls.gov/publicAPI/v2/timeseries/data/"
-        headers = {
-            'BLS-API-Version': '2.0',
-            'Content-Type': 'application/json'
+        mock_data['EMPLOYMENT_MOCK'] = {
+            'value': 158000.0,  # ~158 million employed
+            'date': '2024-11',
+            'description': 'Employment (Mock Data - BLS API Key Missing)',
+            'source': 'Mock'
         }
-        payload = {
-            'seriesid': [series_id],
-            'startyear': '2024',
-            'endyear': '2024'
-        }
-        
-        response = requests.post(url, headers=headers, json=payload, timeout=30)
-        response.raise_for_status()
-        
-        data = response.json()
-        if 'Results' in data and 'series' in data['Results']:
-            series_data = data['Results']['series'][0]
-            if 'data' in series_data and series_data['data']:
-                latest = series_data['data'][0]
-                return {
-                    'value': float(latest.get('value', 0)),
-                    'date': f"{latest.get('year', '')}-{latest.get('period', '')}",
-                    'description': series_data.get('catalog', {}).get('series_title', '')
-                }
-    except Exception as e:
-        logger.error(f"BLS API error: {e}")
     
-    return None
-
-def get_census_data(program="acs/acs5", variables="B25077_001E", geography="state:*"):
-    """Get data from Census API"""
+    # Mock Census housing data
     if not CENSUS_API_KEY:
-        return None
-    
-    try:
-        url = f"https://api.census.gov/data/2022/{program}"
-        params = {
-            'get': variables,
-            'for': geography,
-            'key': CENSUS_API_KEY
+        mock_data['HOME_VALUE_MOCK'] = {
+            'value': 420000.0,  # ~$420k median
+            'date': '2022',
+            'description': 'Home Value (Mock Data - Census API Key Missing)',
+            'source': 'Mock'
         }
-        
-        response = requests.get(url, params=params, timeout=30)
-        response.raise_for_status()
-        
-        data = response.json()
-        if len(data) > 1:  # First row is headers
-            # Get median home value for California as example
-            for row in data[1:]:
-                if len(row) >= 3 and row[2] == '06':  # California state code
-                    return {
-                        'value': float(row[0]) if row[0] != 'null' else 0,
-                        'date': '2022',
-                        'description': 'Median Home Value (ACS 5-year)'
-                    }
-    except Exception as e:
-        logger.error(f"Census API error: {e}")
     
-    return None
+    return mock_data
 
 # Create Dash app
 app = dash.Dash(__name__, title="API-Only Real Estate Dashboard")
@@ -326,24 +260,24 @@ app.layout = html.Div([
     # Key Metrics Row 2
     html.Div([
         html.Div([
-            html.H4("🏭 GDP (BEA)", id='gdp-title'),
+            html.H4("🏭 Real GDP", id='gdp-title'),
             html.H2(id='gdp-value', style={'color': '#9b59b6'}),
             html.P(id='gdp-date', style={'fontSize': '12px', 'color': '#7f8c8d'}),
-            html.P("Source: BEA", style={'fontSize': '10px', 'color': '#95a5a6'})
+            html.P(id='gdp-source', style={'fontSize': '10px', 'color': '#95a5a6'})
         ], style={'textAlign': 'center', 'padding': '20px', 'backgroundColor': '#f8f9fa', 'borderRadius': '10px', 'margin': '10px'}),
         
         html.Div([
-            html.H4("👥 Employment (BLS)", id='employment-title'),
+            html.H4("👥 Employment", id='employment-title'),
             html.H2(id='employment-value', style={'color': '#e67e22'}),
             html.P(id='employment-date', style={'fontSize': '12px', 'color': '#7f8c8d'}),
-            html.P("Source: BLS", style={'fontSize': '10px', 'color': '#95a5a6'})
+            html.P(id='employment-source', style={'fontSize': '10px', 'color': '#95a5a6'})
         ], style={'textAlign': 'center', 'padding': '20px', 'backgroundColor': '#f8f9fa', 'borderRadius': '10px', 'margin': '10px'}),
         
         html.Div([
-            html.H4("🏠 Median Home Value", id='home-value-title'),
+            html.H4("🏠 Home Prices", id='home-value-title'),
             html.H2(id='home-value-value', style={'color': '#16a085'}),
             html.P(id='home-value-date', style={'fontSize': '12px', 'color': '#7f8c8d'}),
-            html.P("Source: Census", style={'fontSize': '10px', 'color': '#95a5a6'})
+            html.P(id='home-value-source', style={'fontSize': '10px', 'color': '#95a5a6'})
         ], style={'textAlign': 'center', 'padding': '20px', 'backgroundColor': '#f8f9fa', 'borderRadius': '10px', 'margin': '10px'}),
         
         html.Div([
@@ -402,10 +336,15 @@ app.layout = html.Div([
                 {'label': '30-Year Mortgage Rate', 'value': 'MORTGAGE30US'},
                 {'label': 'Consumer Price Index', 'value': 'CPIAUCSL'},
                 {'label': 'Unemployment Rate', 'value': 'UNRATE'},
-                {'label': '10-Year Treasury Rate', 'value': 'DGS10'}
+                {'label': '10-Year Treasury Rate', 'value': 'DGS10'},
+                {'label': 'Real GDP', 'value': 'GDPC1'},
+                {'label': 'Total Nonfarm Payrolls', 'value': 'PAYEMS'},
+                {'label': 'Median Sales Price of Houses', 'value': 'MSPUS'},
+                {'label': 'Housing Starts', 'value': 'HOUST'},
+                {'label': 'Case-Shiller Home Price Index', 'value': 'CSUSHPISA'}
             ],
             value='MORTGAGE30US',
-            style={'width': '400px', 'margin': '0 auto 20px auto'}
+            style={'width': '500px', 'margin': '0 auto 20px auto'}
         ),
         dcc.Graph(id='historical-chart')
     ], style={'marginTop': '30px'}),
@@ -428,10 +367,13 @@ app.layout = html.Div([
      Output('treasury-date', 'children'),
      Output('gdp-value', 'children'),
      Output('gdp-date', 'children'),
+     Output('gdp-source', 'children'),
      Output('employment-value', 'children'),
      Output('employment-date', 'children'),
+     Output('employment-source', 'children'),
      Output('home-value-value', 'children'),
      Output('home-value-date', 'children'),
+     Output('home-value-source', 'children'),
      Output('api-status-value', 'children'),
      Output('api-status-date', 'children')],
     [Input('mortgage-rate-value', 'id')]
@@ -444,14 +386,19 @@ def update_metrics(_):
     cpi_data = metrics.get('CPIAUCSL', {})
     unemployment_data = metrics.get('UNRATE', {})
     treasury_data = metrics.get('DGS10', {})
-    gdp_data = metrics.get('GDP', {})
-    employment_data = metrics.get('EMPLOYMENT', {})
-    home_value_data = metrics.get('MEDIAN_HOME_VALUE', {})
     
-    # Count working APIs
-    working_apis = sum(1 for key in ['MORTGAGE30US', 'CPIAUCSL', 'UNRATE', 'DGS10', 'GDP', 'EMPLOYMENT', 'MEDIAN_HOME_VALUE'] 
-                      if metrics.get(key))
-    total_apis = 7
+    # Try FRED GDP first, then mock
+    gdp_data = metrics.get('GDPC1', metrics.get('GDP_MOCK', {}))
+    
+    # Try FRED employment first, then mock
+    employment_data = metrics.get('PAYEMS', metrics.get('EMPLOYMENT_MOCK', {}))
+    
+    # Try FRED home prices first, then mock
+    home_value_data = metrics.get('MSPUS', metrics.get('CSUSHPISA', metrics.get('HOME_VALUE_MOCK', {})))
+    
+    # Count working data sources
+    working_sources = len([m for m in metrics.values() if m.get('value') is not None])
+    total_sources = len(metrics)
     
     return (
         f"{mortgage_data.get('value', 'N/A'):.2f}%" if mortgage_data.get('value') else "N/A",
@@ -464,12 +411,15 @@ def update_metrics(_):
         treasury_data.get('date', 'No data'),
         f"${gdp_data.get('value', 'N/A'):,.0f}B" if gdp_data.get('value') else "N/A",
         gdp_data.get('date', 'No data'),
+        f"Source: {gdp_data.get('source', 'N/A')}",
         f"{employment_data.get('value', 'N/A'):,.0f}K" if employment_data.get('value') else "N/A",
         employment_data.get('date', 'No data'),
+        f"Source: {employment_data.get('source', 'N/A')}",
         f"${home_value_data.get('value', 'N/A'):,.0f}" if home_value_data.get('value') else "N/A",
         home_value_data.get('date', 'No data'),
-        f"{working_apis}/{total_apis}",
-        f"APIs Working"
+        f"Source: {home_value_data.get('source', 'N/A')}",
+        f"{working_sources}/{total_sources}",
+        f"Data Sources"
     )
 
 @app.callback(
@@ -536,7 +486,12 @@ def update_historical_chart(selected_metric):
         'MORTGAGE30US': '30-Year Mortgage Rate',
         'CPIAUCSL': 'Consumer Price Index',
         'UNRATE': 'Unemployment Rate',
-        'DGS10': '10-Year Treasury Rate'
+        'DGS10': '10-Year Treasury Rate',
+        'GDPC1': 'Real GDP',
+        'PAYEMS': 'Total Nonfarm Payrolls',
+        'MSPUS': 'Median Sales Price of Houses',
+        'HOUST': 'Housing Starts',
+        'CSUSHPISA': 'Case-Shiller Home Price Index'
     }
     
     fig.update_layout(

@@ -7,8 +7,8 @@ services:
     env: python
     plan: free
     buildCommand: |
-      pip install --upgrade pip
-      pip install -r requirements.txt
+      pip install --upgrade pip setuptools wheel
+      pip install --no-cache-dir -r requirements.txt
     startCommand: gunicorn app:server --bind 0.0.0.0:$PORT --workers 1 --threads 2 --timeout 0 --preload
     envVars:
       - key: PYTHON_VERSION

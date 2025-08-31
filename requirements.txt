@@ -1,21 +1,26 @@
-# Ultra-minimal requirements for Render deployment
+# Requirements for Render deployment with pre-compiled wheels
 # Developed by Maksim Kitikov - Upside Analytics
 
-# Core web framework (stable versions)
-dash==2.14.1
-plotly==5.15.0
-gunicorn==20.1.0
+# Core web framework
+dash==2.16.1
+plotly==5.18.0
+gunicorn==21.2.0
 
 # Database
-psycopg2-binary==2.9.7
+SQLAlchemy==2.0.32
+psycopg2-binary==2.9.9
+
+# Data processing (using pre-compiled wheels)
+pandas==2.2.2
+numpy==1.26.4
+
+# Machine learning (lightweight)
+scikit-learn==1.4.2
 
 # Basic utilities
-python-dotenv==1.0.0
-requests==2.31.0
+python-dotenv==1.0.1
+requests==2.32.3
+tenacity==9.0.0
 
-# Removed problematic packages:
-# - pandas (requires numpy compilation)
-# - numpy (C compilation issues)  
-# - scikit-learn (requires numpy/scipy)
-# - SQLAlchemy (can cause issues)
-# - us (not essential)
+# US states utility
+us==3.2.0

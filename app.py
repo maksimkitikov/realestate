@@ -26,29 +26,36 @@ app = None
 print("🚀 Starting dashboard import process...")
 
 try:
-    print("📊 Attempting to load advanced dashboard...")
-    from dashboard_advanced import app
-    print("✅ Successfully loaded advanced dashboard (full version)")
+    print("📊 Attempting to load API-only dashboard...")
+    from dashboard_api_only import app
+    print("✅ Successfully loaded API-only dashboard (recommended for Render)")
 except Exception as e:
-    print(f"⚠️ Advanced dashboard failed to load: {e}")
+    print(f"⚠️ API-only dashboard failed to load: {e}")
     print(f"Error details: {traceback.format_exc()}")
     
     try:
-        print("📊 Attempting to load basic dashboard...")
-        from dashboard import app
-        print("✅ Successfully loaded basic dashboard")
+        print("📊 Attempting to load advanced dashboard...")
+        from dashboard_advanced import app
+        print("✅ Successfully loaded advanced dashboard (full version)")
     except Exception as e2:
-        print(f"⚠️ Basic dashboard failed to load: {e2}")
+        print(f"⚠️ Advanced dashboard failed to load: {e2}")
         
         try:
-            print("📊 Attempting to load simple render dashboard...")
-            from dashboard_simple_render import app
-            print("✅ Successfully loaded simple render dashboard (fallback)")
+            print("📊 Attempting to load basic dashboard...")
+            from dashboard import app
+            print("✅ Successfully loaded basic dashboard")
         except Exception as e3:
-            print(f"⚠️ Simple render dashboard failed to load: {e3}")
-            print("🔧 Creating minimal fallback app...")
-            app = create_fallback_app()
-            print("✅ Created minimal fallback app")
+            print(f"⚠️ Basic dashboard failed to load: {e3}")
+            
+            try:
+                print("📊 Attempting to load simple render dashboard...")
+                from dashboard_simple_render import app
+                print("✅ Successfully loaded simple render dashboard (fallback)")
+            except Exception as e4:
+                print(f"⚠️ Simple render dashboard failed to load: {e4}")
+                print("🔧 Creating minimal fallback app...")
+                app = create_fallback_app()
+                print("✅ Created minimal fallback app")
 
 if app is None:
     print("❌ Critical error: No app created")

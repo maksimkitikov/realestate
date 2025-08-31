@@ -7,18 +7,23 @@ Developed by Maksim Kitikov - Upside Analytics
 import os
 import sys
 
-# Try to import the advanced dashboard, fallback to simple if needed
+# Try to import dashboards in order of complexity
 try:
-    from dashboard_advanced import app
-    print("✅ Loaded advanced dashboard")
+    from dashboard_simple_render import app
+    print("✅ Loaded simple render dashboard")
 except ImportError as e:
-    print(f"⚠️ Advanced dashboard failed to load: {e}")
+    print(f"⚠️ Simple render dashboard failed to load: {e}")
     try:
-        from dashboard import app
-        print("✅ Loaded basic dashboard")
+        from dashboard_advanced import app
+        print("✅ Loaded advanced dashboard")
     except ImportError as e2:
-        print(f"❌ All dashboards failed to load: {e2}")
-        sys.exit(1)
+        print(f"⚠️ Advanced dashboard failed to load: {e2}")
+        try:
+            from dashboard import app
+            print("✅ Loaded basic dashboard")
+        except ImportError as e3:
+            print(f"❌ All dashboards failed to load: {e3}")
+            sys.exit(1)
 
 # Export server for Gunicorn
 server = app.server

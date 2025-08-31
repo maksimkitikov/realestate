@@ -1,0 +1,24 @@
+# Render Configuration for Real Estate Dashboard
+# Developed by Maksim Kitikov - Upside Analytics
+
+services:
+  - type: web
+    name: realestate-dashboard
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python dashboard_advanced.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: DATABASE_URL
+        sync: false  # Set this manually in Render dashboard
+    healthCheckPath: /
+    autoDeploy: true
+    branch: main
+
+databases:
+  - name: realestate-postgres
+    databaseName: realestate_db
+    user: realestate_user
+    plan: free

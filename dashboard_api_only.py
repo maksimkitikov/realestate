@@ -65,7 +65,7 @@ def get_fred_data(series_id):
     return None
 
 def get_latest_metrics():
-    """Get latest economic metrics from APIs"""
+    """Get latest economic metrics from all APIs"""
     metrics = {}
     
     # FRED Series IDs
@@ -76,14 +76,46 @@ def get_latest_metrics():
         'DGS10': '10-Year Treasury Constant Maturity Rate'
     }
     
+    # Get FRED data
     for series_id, description in fred_series.items():
         data = get_fred_data(series_id)
         if data and data['value'] is not None:
             metrics[series_id] = {
                 'value': data['value'],
                 'date': data['date'],
-                'description': description
+                'description': description,
+                'source': 'FRED'
             }
+    
+    # Get BEA GDP data
+    bea_data = get_bea_data("GDP", "T10101")
+    if bea_data:
+        metrics['GDP'] = {
+            'value': bea_data['value'],
+            'date': bea_data['date'],
+            'description': 'Gross Domestic Product (BEA)',
+            'source': 'BEA'
+        }
+    
+    # Get BLS employment data
+    bls_data = get_bls_data("CES0000000001")
+    if bls_data:
+        metrics['EMPLOYMENT'] = {
+            'value': bls_data['value'],
+            'date': bls_data['date'],
+            'description': 'Total Nonfarm Employment (BLS)',
+            'source': 'BLS'
+        }
+    
+    # Get Census housing data
+    census_data = get_census_data()
+    if census_data:
+        metrics['MEDIAN_HOME_VALUE'] = {
+            'value': census_data['value'],
+            'date': census_data['date'],
+            'description': 'Median Home Value (Census ACS)',
+            'source': 'Census'
+        }
     
     return metrics
 
@@ -142,6 +174,108 @@ def get_states_data():
     
     return pd.DataFrame(states)
 
+def get_bea_data(series_id, table_id="GDP"):
+    """Get data from BEA API"""
+    if not BEA_API_KEY:
+        return None
+    
+    try:
+        url = "https://apps.bea.gov/api/data"
+        params = {
+            'UserID': BEA_API_KEY,
+            'Method': 'GetData',
+            'DataSetName': 'NIPA',
+            'TableName': table_id,
+            'Frequency': 'Q',
+            'Year': '2023,2024',
+            'ResultFormat': 'JSON'
+        }
+        
+        response = requests.get(url, params=params, timeout=30)
+        response.raise_for_status()
+        
+        data = response.json()
+        if 'BEAAPI' in data and 'Results' in data['BEAAPI']:
+            results = data['BEAAPI']['Results']
+            if 'Data' in results:
+                latest_data = results['Data'][-1] if results['Data'] else None
+                if latest_data:
+                    return {
+                        'value': float(latest_data.get('DataValue', 0)),
+                        'date': latest_data.get('TimePeriod', ''),
+                        'description': latest_data.get('LineDescription', '')
+                    }
+    except Exception as e:
+        logger.error(f"BEA API error: {e}")
+    
+    return None
+
+def get_bls_data(series_id):
+    """Get data from BLS API"""
+    if not BLS_API_KEY:
+        return None
+    
+    try:
+        url = "https://api.bls.gov/publicAPI/v2/timeseries/data/"
+        headers = {
+            'BLS-API-Version': '2.0',
+            'Content-Type': 'application/json'
+        }
+        payload = {
+            'seriesid': [series_id],
+            'startyear': '2024',
+            'endyear': '2024'
+        }
+        
+        response = requests.post(url, headers=headers, json=payload, timeout=30)
+        response.raise_for_status()
+        
+        data = response.json()
+        if 'Results' in data and 'series' in data['Results']:
+            series_data = data['Results']['series'][0]
+            if 'data' in series_data and series_data['data']:
+                latest = series_data['data'][0]
+                return {
+                    'value': float(latest.get('value', 0)),
+                    'date': f"{latest.get('year', '')}-{latest.get('period', '')}",
+                    'description': series_data.get('catalog', {}).get('series_title', '')
+                }
+    except Exception as e:
+        logger.error(f"BLS API error: {e}")
+    
+    return None
+
+def get_census_data(program="acs/acs5", variables="B25077_001E", geography="state:*"):
+    """Get data from Census API"""
+    if not CENSUS_API_KEY:
+        return None
+    
+    try:
+        url = f"https://api.census.gov/data/2022/{program}"
+        params = {
+            'get': variables,
+            'for': geography,
+            'key': CENSUS_API_KEY
+        }
+        
+        response = requests.get(url, params=params, timeout=30)
+        response.raise_for_status()
+        
+        data = response.json()
+        if len(data) > 1:  # First row is headers
+            # Get median home value for California as example
+            for row in data[1:]:
+                if len(row) >= 3 and row[2] == '06':  # California state code
+                    return {
+                        'value': float(row[0]) if row[0] != 'null' else 0,
+                        'date': '2022',
+                        'description': 'Median Home Value (ACS 5-year)'
+                    }
+    except Exception as e:
+        logger.error(f"Census API error: {e}")
+    
+    return None
+
 # Create Dash app
 app = dash.Dash(__name__, title="API-Only Real Estate Dashboard")
 
@@ -154,34 +288,69 @@ app.layout = html.Div([
                 style={'textAlign': 'center', 'color': '#7f8c8d', 'marginBottom': 10}),
         html.H4("Developed by Maksim Kitikov - Upside Analytics", 
                 style={'textAlign': 'center', 'color': '#000000', 'marginBottom': 10, 'fontWeight': 'bold'}),
-        html.P("📊 Live data from FRED API (Federal Reserve Economic Data)", 
+        html.P("📊 Live data from FRED, BEA, BLS & Census APIs", 
                style={'textAlign': 'center', 'color': '#95a5a6', 'fontSize': '12px', 'marginBottom': 30})
     ]),
     
-    # Key Metrics Row
+    # Key Metrics Row 1
     html.Div([
         html.Div([
             html.H4("📈 Mortgage Rate", id='mortgage-rate-title'),
             html.H2(id='mortgage-rate-value', style={'color': '#e74c3c'}),
-            html.P(id='mortgage-rate-date', style={'fontSize': '12px', 'color': '#7f8c8d'})
+            html.P(id='mortgage-rate-date', style={'fontSize': '12px', 'color': '#7f8c8d'}),
+            html.P("Source: FRED", style={'fontSize': '10px', 'color': '#95a5a6'})
         ], style={'textAlign': 'center', 'padding': '20px', 'backgroundColor': '#f8f9fa', 'borderRadius': '10px', 'margin': '10px'}),
         
         html.Div([
             html.H4("💰 CPI Index", id='cpi-title'),
             html.H2(id='cpi-value', style={'color': '#3498db'}),
-            html.P(id='cpi-date', style={'fontSize': '12px', 'color': '#7f8c8d'})
+            html.P(id='cpi-date', style={'fontSize': '12px', 'color': '#7f8c8d'}),
+            html.P("Source: FRED", style={'fontSize': '10px', 'color': '#95a5a6'})
         ], style={'textAlign': 'center', 'padding': '20px', 'backgroundColor': '#f8f9fa', 'borderRadius': '10px', 'margin': '10px'}),
         
         html.Div([
             html.H4("📊 Unemployment", id='unemployment-title'),
             html.H2(id='unemployment-value', style={'color': '#f39c12'}),
-            html.P(id='unemployment-date', style={'fontSize': '12px', 'color': '#7f8c8d'})
+            html.P(id='unemployment-date', style={'fontSize': '12px', 'color': '#7f8c8d'}),
+            html.P("Source: FRED", style={'fontSize': '10px', 'color': '#95a5a6'})
         ], style={'textAlign': 'center', 'padding': '20px', 'backgroundColor': '#f8f9fa', 'borderRadius': '10px', 'margin': '10px'}),
         
         html.Div([
             html.H4("📈 Treasury 10Y", id='treasury-title'),
             html.H2(id='treasury-value', style={'color': '#27ae60'}),
-            html.P(id='treasury-date', style={'fontSize': '12px', 'color': '#7f8c8d'})
+            html.P(id='treasury-date', style={'fontSize': '12px', 'color': '#7f8c8d'}),
+            html.P("Source: FRED", style={'fontSize': '10px', 'color': '#95a5a6'})
+        ], style={'textAlign': 'center', 'padding': '20px', 'backgroundColor': '#f8f9fa', 'borderRadius': '10px', 'margin': '10px'})
+    ], style={'display': 'flex', 'justifyContent': 'space-around', 'marginBottom': '20px'}),
+    
+    # Key Metrics Row 2
+    html.Div([
+        html.Div([
+            html.H4("🏭 GDP (BEA)", id='gdp-title'),
+            html.H2(id='gdp-value', style={'color': '#9b59b6'}),
+            html.P(id='gdp-date', style={'fontSize': '12px', 'color': '#7f8c8d'}),
+            html.P("Source: BEA", style={'fontSize': '10px', 'color': '#95a5a6'})
+        ], style={'textAlign': 'center', 'padding': '20px', 'backgroundColor': '#f8f9fa', 'borderRadius': '10px', 'margin': '10px'}),
+        
+        html.Div([
+            html.H4("👥 Employment (BLS)", id='employment-title'),
+            html.H2(id='employment-value', style={'color': '#e67e22'}),
+            html.P(id='employment-date', style={'fontSize': '12px', 'color': '#7f8c8d'}),
+            html.P("Source: BLS", style={'fontSize': '10px', 'color': '#95a5a6'})
+        ], style={'textAlign': 'center', 'padding': '20px', 'backgroundColor': '#f8f9fa', 'borderRadius': '10px', 'margin': '10px'}),
+        
+        html.Div([
+            html.H4("🏠 Median Home Value", id='home-value-title'),
+            html.H2(id='home-value-value', style={'color': '#16a085'}),
+            html.P(id='home-value-date', style={'fontSize': '12px', 'color': '#7f8c8d'}),
+            html.P("Source: Census", style={'fontSize': '10px', 'color': '#95a5a6'})
+        ], style={'textAlign': 'center', 'padding': '20px', 'backgroundColor': '#f8f9fa', 'borderRadius': '10px', 'margin': '10px'}),
+        
+        html.Div([
+            html.H4("📊 API Status", id='api-status-title'),
+            html.H2(id='api-status-value', style={'color': '#2c3e50'}),
+            html.P(id='api-status-date', style={'fontSize': '12px', 'color': '#7f8c8d'}),
+            html.P("All Sources", style={'fontSize': '10px', 'color': '#95a5a6'})
         ], style={'textAlign': 'center', 'padding': '20px', 'backgroundColor': '#f8f9fa', 'borderRadius': '10px', 'margin': '10px'})
     ], style={'display': 'flex', 'justifyContent': 'space-around', 'marginBottom': '30px'}),
     
@@ -256,17 +425,33 @@ app.layout = html.Div([
      Output('unemployment-value', 'children'),
      Output('unemployment-date', 'children'),
      Output('treasury-value', 'children'),
-     Output('treasury-date', 'children')],
+     Output('treasury-date', 'children'),
+     Output('gdp-value', 'children'),
+     Output('gdp-date', 'children'),
+     Output('employment-value', 'children'),
+     Output('employment-date', 'children'),
+     Output('home-value-value', 'children'),
+     Output('home-value-date', 'children'),
+     Output('api-status-value', 'children'),
+     Output('api-status-date', 'children')],
     [Input('mortgage-rate-value', 'id')]
 )
 def update_metrics(_):
-    """Update key metrics from FRED API"""
+    """Update key metrics from all APIs"""
     metrics = get_latest_metrics()
     
     mortgage_data = metrics.get('MORTGAGE30US', {})
     cpi_data = metrics.get('CPIAUCSL', {})
     unemployment_data = metrics.get('UNRATE', {})
     treasury_data = metrics.get('DGS10', {})
+    gdp_data = metrics.get('GDP', {})
+    employment_data = metrics.get('EMPLOYMENT', {})
+    home_value_data = metrics.get('MEDIAN_HOME_VALUE', {})
+    
+    # Count working APIs
+    working_apis = sum(1 for key in ['MORTGAGE30US', 'CPIAUCSL', 'UNRATE', 'DGS10', 'GDP', 'EMPLOYMENT', 'MEDIAN_HOME_VALUE'] 
+                      if metrics.get(key))
+    total_apis = 7
     
     return (
         f"{mortgage_data.get('value', 'N/A'):.2f}%" if mortgage_data.get('value') else "N/A",
@@ -276,7 +461,15 @@ def update_metrics(_):
         f"{unemployment_data.get('value', 'N/A'):.1f}%" if unemployment_data.get('value') else "N/A",
         unemployment_data.get('date', 'No data'),
         f"{treasury_data.get('value', 'N/A'):.2f}%" if treasury_data.get('value') else "N/A",
-        treasury_data.get('date', 'No data')
+        treasury_data.get('date', 'No data'),
+        f"${gdp_data.get('value', 'N/A'):,.0f}B" if gdp_data.get('value') else "N/A",
+        gdp_data.get('date', 'No data'),
+        f"{employment_data.get('value', 'N/A'):,.0f}K" if employment_data.get('value') else "N/A",
+        employment_data.get('date', 'No data'),
+        f"${home_value_data.get('value', 'N/A'):,.0f}" if home_value_data.get('value') else "N/A",
+        home_value_data.get('date', 'No data'),
+        f"{working_apis}/{total_apis}",
+        f"APIs Working"
     )
 
 @app.callback(
@@ -362,19 +555,31 @@ def update_historical_chart(selected_metric):
 )
 def update_system_status(_):
     """Update system status"""
+    # Check API key availability
+    fred_status = "✅ Available" if FRED_API_KEY else "❌ Missing"
+    bea_status = "✅ Available" if BEA_API_KEY else "❌ Missing"
+    bls_status = "✅ Available" if BLS_API_KEY else "❌ Missing"
+    census_status = "✅ Available" if CENSUS_API_KEY else "❌ Missing"
+    
     status_html = [
         html.Div([
             html.Strong("Status: "), "✅ Running",
             html.Br(),
-            html.Strong("Data Source: "), "FRED API (Federal Reserve)",
+            html.Strong("Data Sources: "), "FRED, BEA, BLS & Census APIs",
             html.Br(),
-            html.Strong("API Keys: "), f"{'✅ Available' if FRED_API_KEY else '❌ Missing'}",
+            html.Strong("FRED API: "), fred_status,
+            html.Br(),
+            html.Strong("BEA API: "), bea_status,
+            html.Br(),
+            html.Strong("BLS API: "), bls_status,
+            html.Br(),
+            html.Strong("Census API: "), census_status,
             html.Br(),
             html.Strong("Developer: "), "Maksim Kitikov - Upside Analytics",
             html.Br(),
             html.Strong("Last Update: "), datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             html.Br(),
-            html.Strong("Mode: "), "API-Only (No Database Required)",
+            html.Strong("Mode: "), "Multi-API (No Database Required)",
         ], style={'textAlign': 'left'})
     ]
     

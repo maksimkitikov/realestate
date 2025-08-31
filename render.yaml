@@ -6,21 +6,17 @@ services:
     name: realestate-dashboard
     env: python
     plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:server --bind 0.0.0.0:$PORT --workers 1 --threads 2 --timeout 120
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+    startCommand: gunicorn app:server --bind 0.0.0.0:$PORT --workers 1 --threads 2 --timeout 0 --preload
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11.0
+        value: 3.11.7
       - key: PORT
-        value: 8050
+        generateValue: true
       - key: DATABASE_URL
         sync: false  # Set this manually in Render dashboard
     healthCheckPath: /
     autoDeploy: true
     branch: main
-
-databases:
-  - name: realestate-postgres
-    databaseName: realestate_db
-    user: realestate_user
-    plan: free

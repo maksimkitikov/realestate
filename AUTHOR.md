@@ -2,8 +2,8 @@
 
 ## Author Information
 
-**Developer:** Maksim Kitikov  
-**Company:** Upside Analytics  
+**Developer:** **Maksim Kitikov**  
+**Company:** **Upside Analytics**  
 **Email:** maksimkitikov.uk@gmail.com  
 
 ## Project Description

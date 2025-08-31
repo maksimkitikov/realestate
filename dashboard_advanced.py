@@ -511,7 +511,7 @@ app.layout = html.Div([
         html.H3("Interactive State-Level Analysis with Regression Models", 
                 style={'textAlign': 'center', 'color': '#7f8c8d', 'marginBottom': 10}),
         html.H4("Developed by Maksim Kitikov - Upside Analytics", 
-                style={'textAlign': 'center', 'color': '#e74c3c', 'marginBottom': 10, 'fontWeight': 'bold'}),
+                style={'textAlign': 'center', 'color': '#000000', 'marginBottom': 10, 'fontWeight': 'bold'}),
         html.P("📊 Data Source: FRED API (Federal Reserve Economic Data)", 
                style={'textAlign': 'center', 'color': '#95a5a6', 'fontSize': '12px', 'marginBottom': 30})
     ]),

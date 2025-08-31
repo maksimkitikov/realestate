@@ -2,7 +2,11 @@
 
 ## 🏠 Advanced US Real Estate Analytics Platform
 
-**Developed by Maksim Kitikov - Upside Analytics**
+**DEVELOPED BY MAKSIM KITIKOV - UPSIDE ANALYTICS**
+
+**Developer:** **Maksim Kitikov**  
+**Company:** **Upside Analytics**  
+**Email:** maksimkitikov.uk@gmail.com
 
 Interactive dashboard for comprehensive US real estate market analysis with machine learning models and regression analysis.
 
@@ -70,8 +74,8 @@ Interactive dashboard for comprehensive US real estate market analysis with mach
 
 ## 📞 Contact
 
-**Developer:** Maksim Kitikov  
-**Company:** Upside Analytics  
+**Developer:** **Maksim Kitikov**  
+**Company:** **Upside Analytics**  
 **Email:** maksimkitikov.uk@gmail.com  
 
 ## 📄 License

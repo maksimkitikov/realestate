@@ -16,7 +16,7 @@ ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO5Hq75dYlP2b42CXWCJzrfRgslfg+KZwGBpE9TBSDZa
 ```
 
 ### Instructions:
-1. Go to: https://github.com/maksimkitikov/realestate1/settings/keys/new
+1. Go to: https://github.com/maksimkitikov/realestate/settings/keys/new
 2. **Title:** `Real Estate Dashboard Deploy Key`
 3. **Key:** Paste the SSH key above
 4. **Allow write access:** ✅ Check this box
@@ -36,7 +36,7 @@ chmod +x deploy_to_github.sh
 git init
 
 # Add remote origin
-git remote add origin https://github.com/maksimkitikov/realestate1.git
+git remote add origin https://github.com/maksimkitikov/realestate.git
 
 # Configure git user
 git config user.name "Maksim Kitikov"
@@ -59,7 +59,7 @@ git push -u origin main
 
 ### 3.2 Create Web Service
 1. Click **"New +"** → **"Web Service"**
-2. Connect repository: `maksimkitikov/realestate1`
+2. Connect repository: `maksimkitikov/realestate`
 3. Configure settings:
    - **Name:** `realestate-dashboard`
    - **Environment:** `Python 3`

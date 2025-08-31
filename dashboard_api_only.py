@@ -91,9 +91,20 @@ def get_latest_metrics():
     additional_data = get_additional_fred_data()
     metrics.update(additional_data)
     
-    # Get mock data for missing APIs
-    mock_data = get_mock_data_for_missing_apis()
-    metrics.update(mock_data)
+    # Get BEA GDP data
+    bea_data = get_bea_data()
+    if bea_data:
+        metrics['BEA_GDP'] = bea_data
+    
+    # Get BLS employment data
+    bls_data = get_bls_data()
+    if bls_data:
+        metrics['BLS_EMPLOYMENT'] = bls_data
+    
+    # Get Census housing data
+    census_data = get_census_data()
+    if census_data:
+        metrics['CENSUS_HOME_VALUE'] = census_data
     
     return metrics
 
@@ -152,17 +163,123 @@ def get_states_data():
     
     return pd.DataFrame(states)
 
+def get_bea_data():
+    """Get GDP data from BEA API"""
+    if not BEA_API_KEY:
+        return None
+    
+    try:
+        # BEA NIPA Table 1.1.1 - Gross Domestic Product
+        url = "https://apps.bea.gov/api/data"
+        params = {
+            'UserID': BEA_API_KEY,
+            'method': 'GetData',
+            'datasetname': 'NIPA',
+            'TableName': 'T10101',
+            'Frequency': 'Q',
+            'Year': '2024',
+            'ResultFormat': 'json'
+        }
+        
+        response = requests.get(url, params=params, timeout=30)
+        response.raise_for_status()
+        
+        data = response.json()
+        if 'BEAAPI' in data and 'Results' in data['BEAAPI']:
+            results = data['BEAAPI']['Results']
+            if 'Data' in results and results['Data']:
+                # Get latest GDP data
+                latest_data = results['Data'][-1]
+                return {
+                    'value': float(latest_data.get('DataValue', '0').replace(',', '')),
+                    'date': latest_data.get('TimePeriod', ''),
+                    'description': 'Gross Domestic Product (BEA)',
+                    'source': 'BEA'
+                }
+    except Exception as e:
+        logger.error(f"BEA API error: {e}")
+    
+    return None
+
+def get_bls_data():
+    """Get employment data from BLS API"""
+    if not BLS_API_KEY:
+        return None
+    
+    try:
+        # BLS API v2 - Total nonfarm employment
+        url = "https://api.bls.gov/publicAPI/v2/timeseries/data/"
+        headers = {'Content-Type': 'application/json'}
+        
+        payload = {
+            'seriesid': ['CES0000000001'],  # Total nonfarm employment
+            'startyear': '2024',
+            'endyear': '2024',
+            'registrationkey': BLS_API_KEY
+        }
+        
+        response = requests.post(url, headers=headers, json=payload, timeout=30)
+        response.raise_for_status()
+        
+        data = response.json()
+        if data.get('status') == 'REQUEST_SUCCEEDED' and 'Results' in data:
+            series = data['Results']['series'][0]
+            if 'data' in series and series['data']:
+                latest = series['data'][0]  # Most recent data first
+                return {
+                    'value': float(latest.get('value', '0').replace(',', '')),
+                    'date': f"{latest.get('year')}-{latest.get('period')}",
+                    'description': 'Total Nonfarm Employment (BLS)',
+                    'source': 'BLS'
+                }
+    except Exception as e:
+        logger.error(f"BLS API error: {e}")
+    
+    return None
+
+def get_census_data():
+    """Get housing data from Census API"""
+    if not CENSUS_API_KEY:
+        return None
+    
+    try:
+        # Census ACS 5-year - Median home value (B25077_001E)
+        url = "https://api.census.gov/data/2022/acs/acs5"
+        params = {
+            'get': 'B25077_001E,NAME',
+            'for': 'us:1',  # National level
+            'key': CENSUS_API_KEY
+        }
+        
+        response = requests.get(url, params=params, timeout=30)
+        response.raise_for_status()
+        
+        data = response.json()
+        if len(data) > 1:  # First row is headers
+            row = data[1]  # Second row is data
+            if row[0] and row[0] != 'null':
+                return {
+                    'value': float(row[0]),
+                    'date': '2022',
+                    'description': 'Median Home Value US (Census ACS)',
+                    'source': 'Census'
+                }
+    except Exception as e:
+        logger.error(f"Census API error: {e}")
+    
+    return None
+
 def get_additional_fred_data():
     """Get additional economic data from FRED API"""
     additional_metrics = {}
     
     # Additional FRED series for more comprehensive data
     additional_series = {
-        'GDPC1': 'Real GDP',
-        'PAYEMS': 'Total Nonfarm Payrolls', 
-        'MSPUS': 'Median Sales Price of Houses Sold',
-        'HOUST': 'Housing Starts',
-        'CSUSHPISA': 'Case-Shiller Home Price Index'
+        'GDPC1': 'Real GDP (FRED)',
+        'PAYEMS': 'Total Nonfarm Payrolls (FRED)', 
+        'MSPUS': 'Median Sales Price of Houses (FRED)',
+        'HOUST': 'Housing Starts (FRED)',
+        'CSUSHPISA': 'Case-Shiller Home Price Index (FRED)'
     }
     
     for series_id, description in additional_series.items():
@@ -176,39 +293,6 @@ def get_additional_fred_data():
             }
     
     return additional_metrics
-
-def get_mock_data_for_missing_apis():
-    """Provide mock data when other APIs are not available"""
-    mock_data = {}
-    
-    # Mock BEA GDP data
-    if not BEA_API_KEY:
-        mock_data['GDP_MOCK'] = {
-            'value': 27000.0,  # ~27 trillion
-            'date': '2024-Q3',
-            'description': 'GDP (Mock Data - BEA API Key Missing)',
-            'source': 'Mock'
-        }
-    
-    # Mock BLS employment data  
-    if not BLS_API_KEY:
-        mock_data['EMPLOYMENT_MOCK'] = {
-            'value': 158000.0,  # ~158 million employed
-            'date': '2024-11',
-            'description': 'Employment (Mock Data - BLS API Key Missing)',
-            'source': 'Mock'
-        }
-    
-    # Mock Census housing data
-    if not CENSUS_API_KEY:
-        mock_data['HOME_VALUE_MOCK'] = {
-            'value': 420000.0,  # ~$420k median
-            'date': '2022',
-            'description': 'Home Value (Mock Data - Census API Key Missing)',
-            'source': 'Mock'
-        }
-    
-    return mock_data
 
 # Create Dash app
 app = dash.Dash(__name__, title="API-Only Real Estate Dashboard")
@@ -333,15 +417,15 @@ app.layout = html.Div([
         dcc.Dropdown(
             id='metric-selector',
             options=[
-                {'label': '30-Year Mortgage Rate', 'value': 'MORTGAGE30US'},
-                {'label': 'Consumer Price Index', 'value': 'CPIAUCSL'},
-                {'label': 'Unemployment Rate', 'value': 'UNRATE'},
-                {'label': '10-Year Treasury Rate', 'value': 'DGS10'},
-                {'label': 'Real GDP', 'value': 'GDPC1'},
-                {'label': 'Total Nonfarm Payrolls', 'value': 'PAYEMS'},
-                {'label': 'Median Sales Price of Houses', 'value': 'MSPUS'},
-                {'label': 'Housing Starts', 'value': 'HOUST'},
-                {'label': 'Case-Shiller Home Price Index', 'value': 'CSUSHPISA'}
+                {'label': '📈 30-Year Mortgage Rate (FRED)', 'value': 'MORTGAGE30US'},
+                {'label': '💰 Consumer Price Index (FRED)', 'value': 'CPIAUCSL'},
+                {'label': '📊 Unemployment Rate (FRED)', 'value': 'UNRATE'},
+                {'label': '📈 10-Year Treasury Rate (FRED)', 'value': 'DGS10'},
+                {'label': '🏭 Real GDP (FRED)', 'value': 'GDPC1'},
+                {'label': '👥 Total Nonfarm Payrolls (FRED)', 'value': 'PAYEMS'},
+                {'label': '🏠 Median Sales Price Houses (FRED)', 'value': 'MSPUS'},
+                {'label': '🏗️ Housing Starts (FRED)', 'value': 'HOUST'},
+                {'label': '📊 Case-Shiller Home Price Index (FRED)', 'value': 'CSUSHPISA'}
             ],
             value='MORTGAGE30US',
             style={'width': '500px', 'margin': '0 auto 20px auto'}
@@ -387,14 +471,14 @@ def update_metrics(_):
     unemployment_data = metrics.get('UNRATE', {})
     treasury_data = metrics.get('DGS10', {})
     
-    # Try FRED GDP first, then mock
-    gdp_data = metrics.get('GDPC1', metrics.get('GDP_MOCK', {}))
+    # Try BEA GDP first, then FRED GDP as fallback
+    gdp_data = metrics.get('BEA_GDP', metrics.get('GDPC1', {}))
     
-    # Try FRED employment first, then mock
-    employment_data = metrics.get('PAYEMS', metrics.get('EMPLOYMENT_MOCK', {}))
+    # Try BLS employment first, then FRED employment as fallback
+    employment_data = metrics.get('BLS_EMPLOYMENT', metrics.get('PAYEMS', {}))
     
-    # Try FRED home prices first, then mock
-    home_value_data = metrics.get('MSPUS', metrics.get('CSUSHPISA', metrics.get('HOME_VALUE_MOCK', {})))
+    # Try Census home value first, then FRED home prices as fallback
+    home_value_data = metrics.get('CENSUS_HOME_VALUE', metrics.get('MSPUS', metrics.get('CSUSHPISA', {})))
     
     # Count working data sources
     working_sources = len([m for m in metrics.values() if m.get('value') is not None])
@@ -510,31 +594,40 @@ def update_historical_chart(selected_metric):
 )
 def update_system_status(_):
     """Update system status"""
-    # Check API key availability
-    fred_status = "✅ Available" if FRED_API_KEY else "❌ Missing"
-    bea_status = "✅ Available" if BEA_API_KEY else "❌ Missing"
-    bls_status = "✅ Available" if BLS_API_KEY else "❌ Missing"
-    census_status = "✅ Available" if CENSUS_API_KEY else "❌ Missing"
+    # Test actual API connectivity
+    metrics = get_latest_metrics()
+    
+    fred_working = any(key in metrics for key in ['MORTGAGE30US', 'CPIAUCSL', 'UNRATE', 'DGS10'])
+    bea_working = 'BEA_GDP' in metrics
+    bls_working = 'BLS_EMPLOYMENT' in metrics  
+    census_working = 'CENSUS_HOME_VALUE' in metrics
+    
+    fred_status = "✅ Working" if fred_working else ("🔑 Key Missing" if not FRED_API_KEY else "❌ Error")
+    bea_status = "✅ Working" if bea_working else ("🔑 Key Missing" if not BEA_API_KEY else "❌ Error")
+    bls_status = "✅ Working" if bls_working else ("🔑 Key Missing" if not BLS_API_KEY else "❌ Error")
+    census_status = "✅ Working" if census_working else ("🔑 Key Missing" if not CENSUS_API_KEY else "❌ Error")
+    
+    total_working = sum([fred_working, bea_working, bls_working, census_working])
     
     status_html = [
         html.Div([
             html.Strong("Status: "), "✅ Running",
             html.Br(),
-            html.Strong("Data Sources: "), "FRED, BEA, BLS & Census APIs",
+            html.Strong("Data Sources: "), f"{total_working}/4 APIs Working",
             html.Br(),
-            html.Strong("FRED API: "), fred_status,
+            html.Strong("FRED API: "), fred_status, " (Primary economic data)",
             html.Br(),
-            html.Strong("BEA API: "), bea_status,
+            html.Strong("BEA API: "), bea_status, " (GDP data)",
             html.Br(),
-            html.Strong("BLS API: "), bls_status,
+            html.Strong("BLS API: "), bls_status, " (Employment data)",
             html.Br(),
-            html.Strong("Census API: "), census_status,
+            html.Strong("Census API: "), census_status, " (Housing data)",
             html.Br(),
             html.Strong("Developer: "), "Maksim Kitikov - Upside Analytics",
             html.Br(),
             html.Strong("Last Update: "), datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             html.Br(),
-            html.Strong("Mode: "), "Multi-API (No Database Required)",
+            html.Strong("Mode: "), "Multi-API Real-time Data",
         ], style={'textAlign': 'left'})
     ]
     
